@@ -1,0 +1,50 @@
+.valor-pix {
+  min-width: 80px;
+}
+
+#pixQrCodeContainer {
+  width: 200px;
+  height: 200px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 auto;
+  background-color: white;
+  padding: 10px;
+}
+
+#pixQrCodeContainer img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.pix-values {
+  transition: all 0.3s ease;
+}
+
+#pix-result {
+  transition: all 0.3s ease;
+}
+
+.base-g-pix-button {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.base-g-pix-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+}
+
+.error-json {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 8px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
