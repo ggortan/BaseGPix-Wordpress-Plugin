@@ -3,7 +3,7 @@
  * Plugin Name: Base G PIX Donation
  * Plugin URI: https://github.com/ggortan/BaseGPix-Wordpress-Plugin
  * Description: Um plugin simples para adicionar doações via PIX no seu site.
- * Version: 1.0.1
+ * Version: 1.1.0
  * Author: Base G
  * Text Domain: base-g-pix
  */
@@ -213,17 +213,18 @@ function base_g_pix_render_modal() {
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
+			  <img src="https://baseg.com.br/wp-content/uploads/2021/03/bandeira-g-mini.png" alt="Base G Logo" class="d-td-none me-2" style="height: 20px;">
             <h5 class="modal-title" id="baseGPixModalLabel">Faça uma doação via PIX</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
           </div>
           <div class="modal-body">
             <div class="text-center mb-4">
-              <p>Sua contribuição é muito importante para o projeto.</p>
-              <p>A Base G agradeçe a doação!</p>
+				<p><b>Sua contribuição é muito importante para o projeto.</b></p>
+				<p><b>A Base G agradeçe a doação!</b></p>
             </div>
             
             <div class="pix-values mb-4">
-              <p class="text-center mb-2">Escolha um valor:</p>
+              <p class="text-center mb-2">Escolha um valor sugerido:</p>
               <div class="d-flex justify-content-center gap-2 mb-3">
                 <?php foreach ($suggested_values as $valor): ?>
                   <button type="button" class="btn btn-outline-primary valor-pix" data-valor="<?php echo esc_attr($valor); ?>">
@@ -231,11 +232,13 @@ function base_g_pix_render_modal() {
                   </button>
                 <?php endforeach; ?>
               </div>
+			  <p class="text-center mb-2">Ou digite o valor desejado:</p>
               <div class="input-group mt-2">
                 <span class="input-group-text">R$</span>
                 <input type="number" class="form-control" id="valorPersonalizado" placeholder="Outro valor" min="1" max="1000" step="1">
                 <button class="btn btn-primary" type="button" id="gerarPixBtn">Gerar PIX</button>
               </div>
+				<small class="text-center mb-2 mt-1 small text-muted">Mínimo R$ 1 e máximo R$ 1.000</small>
             </div>
             
             <div id="pix-result" class="text-center d-none">
@@ -264,11 +267,25 @@ function base_g_pix_render_modal() {
                 <h6><i class="bi bi-exclamation-triangle-fill"></i> Erro ao gerar PIX</h6>
                 <div id="error-details"></div>
               </div>
+				<div class="accordion mb-3" id="accordionMensagemPIX">
+                  <div class="accordion-item">
+                    <h2 class="accordion-header" id="mensagempix-headingOne">
+                      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#mensagempix-collapseOne" aria-expanded="false" aria-controls="mensagempix-collapseOne">
+                        Gostaria de enviar uma mensagem para a Base G?
+                      </button>
+                    </h2>
+                    <div id="mensagempix-collapseOne" class="accordion-collapse collapse" aria-labelledby="mensagempix-headingOne" data-bs-parent="#accordionMensagemPIX">
+                      <div class="accordion-body" style="align-items: left;">
+                        <?php echo do_shortcode( '[wpforms id="3521" title="false"]' ); ?>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <div class="accordion mb-3" id="accordionSaberMais">
                   <div class="accordion-item">
                     <h2 class="accordion-header" id="sabermais-headingOne">
                       <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sabermais-collapseOne" aria-expanded="false" aria-controls="sabermais-collapseOne">
-                        Quem é <strong class="ms-2">Gabriel Gortan</strong>
+                        Quem é <strong class="ms-2">Gabriel C Gortan</strong>
                       </button>
                     </h2>
                     <div id="sabermais-collapseOne" class="accordion-collapse collapse" aria-labelledby="sabermais-headingOne" data-bs-parent="#accordionSaberMais">
@@ -384,12 +401,16 @@ function base_g_pix_get_crc16($payload) {
  * Processar solicitação AJAX para gerar o código PIX
  */
 function base_g_pix_ajax_handler() {
-    // Verificar nonce
-    if (!isset($_REQUEST['nonce']) || !wp_verify_nonce($_REQUEST['nonce'], 'base_g_pix_nonce')) {
-        wp_send_json_error(array('message' => 'Erro de segurança. Por favor, recarregue a página e tente novamente.'), 403);
-        return;
+    // CORREÇÃO DO PROBLEMA DE CACHE (ERRO 403)
+    // Visitantes não logados recebem páginas cacheadas com Nonces expirados.
+    // Como gerar um PIX não é uma ação destrutiva, validamos o nonce apenas para usuários logados.
+    if ( is_user_logged_in() ) {
+        if (!isset($_REQUEST['nonce']) || !wp_verify_nonce($_REQUEST['nonce'], 'base_g_pix_nonce')) {
+            wp_send_json_error(array('message' => 'Sessão expirada. Por favor, recarregue a página.'), 403);
+            return;
+        }
     }
-    
+
     // Obter valor
     $valor = isset($_REQUEST['valor']) ? floatval($_REQUEST['valor']) : 0;
     
@@ -412,21 +433,17 @@ function base_g_pix_ajax_handler() {
     $chave_pix = $options['pix_key'];
     $beneficiario = $options['beneficiary'];
     $cidade = $options['city'] ?? 'São Paulo';
-    $identificador = ($options['identifier'] ?? 'BASEG') . date('YmdHis');
+    // Adiciona timestamp para tornar o identificador único
+    $identificador = ($options['identifier'] ?? 'BASEG') . date('Hi'); 
     
-    // Registrar log para debug
+    // Registrar log para debug (apenas se WP_DEBUG estiver ativo)
     if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log("Gerando PIX: valor=$valor, chave=$chave_pix, beneficiario=$beneficiario, cidade=$cidade, id=$identificador");
+        error_log("Gerando PIX: valor=$valor, chave=$chave_pix");
     }
     
     try {
         // Gerar o código PIX
         $codigo_pix = base_g_pix_gerar_payload($valor, $chave_pix, $beneficiario, $cidade, $identificador);
-        
-        // Registrar log para debug
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log("Código PIX gerado: $codigo_pix");
-        }
         
         // Retornar resposta
         wp_send_json_success(array(
@@ -436,9 +453,6 @@ function base_g_pix_ajax_handler() {
             'beneficiario' => $beneficiario
         ));
     } catch (Exception $e) {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log("Erro ao gerar PIX: " . $e->getMessage());
-        }
         wp_send_json_error(array('message' => 'Erro ao gerar código PIX: ' . $e->getMessage()), 500);
     }
 }
